@@ -2,7 +2,6 @@
 <html lang="en">
 	<head>
 		<title>Whose playlist is it really?</title>
-		<link rel="stylesheet" type="text/css" href="styles.css">
 		<script src="cookieUtils.js"></script>
 		<script>
 			const my_client_id = "ff895af332e24753b4caf584a921c62b";
@@ -17,19 +16,19 @@
 
 				const clientId = getCookie(cookieClientId);
 				if (clientId == null) {
-					console.log("No Client ID found in cookies");
+					// Case 2: Neither access token nor client ID present - stay on this page to obtain client ID
 					return;
 				}
-				console.log("Client ID found in cookies: "     + "*".repeat(getCookie(cookieClientId).length));
 				
-				// Case 2: No access token, but the client ID is present 
+				// Case 3: No access token, but the client ID is present 
 				// Get access token through implicit grant
 				// Although not recommended by spotify, it's easier to implement and requires no backend
+				const redirectUri = window.location.href.split('/').slice(0, -1).join('/') + "/app.html";
 				const scope = "playlist-read-collaborative playlist-read-private";
 				const api_url = "https://accounts.spotify.com/authorize"
 					+ "?client_id=" + clientId
 					+ "&response_type=token"
-					+ "&redirect_uri=" + encodeURIComponent("http://localhost/app.html")
+					+ "&redirect_uri=" + encodeURIComponent(redirectUri)
 					+ "&scope=" + encodeURIComponent(scope)
 				;
 				window.location.replace(api_url);
