@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Whose playlist is it really?</title>
+		<link rel="stylesheet" type="text/css" href="styles.css">
+		<script src="cookieUtils.js"></script>
+		<script>
+			const my_client_id = "ff895af332e24753b4caf584a921c62b";
+			const client_id_cookie_expiry_days = 356*10;
+
+			function checkAndRedirect() {
+				// Case 1: An access token is already present - redirect to app.html
+				if (getCookie(cookieAccessToken) != null) {
+					window.location.href = "app.html";
+					return;
+				}
+
+				const clientId = getCookie(cookieClientId);
+				if (clientId == null) {
+					console.log("No Client ID found in cookies");
+					return;
+				}
+				console.log("Client ID found in cookies: "     + "*".repeat(getCookie(cookieClientId).length));
+				
+				// Case 2: No access token, but the client ID is present 
+				// Get access token through implicit grant
+				// Although not recommended by spotify, it's easier to implement and requires no backend
+				const scope = "playlist-read-collaborative playlist-read-private";
+				const api_url = "https://accounts.spotify.com/authorize"
+					+ "?client_id=" + clientId
+					+ "&response_type=token"
+					+ "&redirect_uri=" + encodeURIComponent("http://localhost/app.html")
+					+ "&scope=" + encodeURIComponent(scope)
+				;
+				window.location.replace(api_url);
+			}
+
+			function saveClicked() {
+				var clientIdToUse = null;
+				const radioInput = document.querySelector('input[name="client_id_method"]:checked').value;
+				if (radioInput == "default") {
+					clientIdToUse = my_client_id;
+				} else {
+					const userInputClientId = document.getElementById("input_client_id").value;
+					if (userInputClientId == "") {
+						alert("Please enter a client ID");
+						return;
+					}
+					clientIdToUse = userInputClientId;
+				}
+
+				setCookie(cookieClientId,     clientIdToUse,     client_id_cookie_expiry_days);
+				checkAndRedirect();
+			}
+
+			function setInputEnabled(enabled) {
+				document.getElementById("input_client_id").disabled = !enabled;
+			}
+			checkAndRedirect();
+		</script>
+	</head>
+	<body>
+		<div>
+			<h2>Configure API access</h2>
+
+			<input type="radio" name="client_id_method" value="default" onclick="setInputEnabled(false)" checked="checked"/>
+			<label for="client_id_method">Use default client ID (rate limited)</label>
+			<br/>
+			<input type="radio" name="client_id_method" value="custom"  onclick="setInputEnabled(true)"/>
+			<label for="client_id_method">Specify your own client ID</label>
+			<br/>
+			<input type="text" id="input_client_id" placeholder="Client ID"/>
+			<script>
+				setInputEnabled(false);
+			</script>
+			<br/>
+			<br/>
+			<button type="button" onclick="saveClicked()">Save</button>
+		</div>
+	</body>
+</html>

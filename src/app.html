@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Whose playlist is it really?</title>
+		<link rel="stylesheet" type="text/css" href="styles.css">
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script src="cookieUtils.js"></script>
+		<script src="bundle.js"></script>
+	</head>
+	<body>
+		<div class="header">
+			<input id="button_logout" type="button" onclick="logoutClicked()" value="Logout" style="float: right"/>
+			<h1>Whose playlist is it really?</h1>
+			<label id="label" for="select_playlists"> <!--This label is dynamically set depending on the users name--> </label>
+			<br/>
+			<select id="select_playlists" name="select_playlists" disabled>
+				<option class="invalid">Scanning your playlists...</option>
+			</select>
+			<input id="button_analyze" type="button" onclick="analyzeClicked()" value="Analyze!" disabled/>
+		</div>
+		<br/>
+		<br/>
+		<div class="charts" style="display: flex">
+			<div style="width: 50%; height: 70%; display: inline-block; flex: 1">
+				<canvas id="pie-chart-num-songs"></canvas>
+			</div>
+			<div style="width: 50%; height: 70%; display: inline-block; flex: 1">
+				<canvas id="pie-chart-playtime"></canvas>
+			</div>
+		</div>
+
+
+		<script>
+			var chartNumSongs = null;
+			var chartPlaytime = null;
+
+			function setInputEnabled(enabled) {
+				document.getElementById("select_playlists").disabled = !enabled;
+				document.getElementById("button_analyze").disabled   = !enabled;
+			}
+			setInputEnabled(false);
+
+			// If there's an access token in the url, save it as a cookie
+			const url = window.location.href;
+			if (url.includes("#access_token=")) {
+				const access_token = url.split("access_token=")[1].split("&")[0];
+				setCookie(cookieAccessToken, access_token, 0, 1);
+				window.location.href = "app.html";
+			}
+
+			const access_token = getCookie(cookieAccessToken);
+			if (access_token == null) {
+				console.log("ERROR: You should only access app.html with an access token")
+				window.location.href = "index.html";
+			}
+			bundle.setAccessToken(access_token);
+
+			// At this point, we can assert that the api is authenticated
+
+			// Greet the user
+			bundle.getDisplayName().then(displayName => {
+				document.getElementById("label").innerHTML = "Hi, " + displayName + "! Which playlist would you like to analyze?";
+			});
+
+			// Fill dropdown with users' collaborative playlists
+			const select_playlists = document.getElementById("select_playlists");
+			bundle.getUsersCollaborativePlaylists().then(playlists => {
+				if (playlists.length <= 0) {
+					document.getElementById("select_playlists").innerHTML = "<option>No collaborative playlists found</option>";
+					setInputEnabled(false);
+					return;
+				}
+				
+				select_playlists.innerHTML = "";
+				for (var playlistinfo of playlists) {
+					const option = document.createElement("option");
+					option.value = JSON.stringify(playlistinfo);
+					option.innerHTML = `${playlistinfo.name} (by ${playlistinfo.owner}, ${playlistinfo.nTracks} tracks)`;
+					select_playlists.appendChild(option);
+				}
+				setInputEnabled(true);
+			});
+
+			async function translateUserIdsToNames(userIds) {
+				let names = [];
+				for (const userId of userIds) {
+					const name = await bundle.getDisplayName(userId);
+					names.push(name);
+				}
+				return names;
+			}
+
+			function analyzeClicked() {
+				setInputEnabled(false);
+				const pi = JSON.parse(select_playlists.value);
+				bundle.getPlaylistTracks(pi.id).then(tracks => {
+					let userDict = {};
+					for (const track of tracks) {
+						if (!(track.addedBy in userDict)) {
+							userDict[track.addedBy] = [];
+						}
+						userDict[track.addedBy].push(track);						
+					}
+					let nSongsDict = {};
+					for (const user in userDict) {
+						nSongsDict[user] = userDict[user].length;
+					}
+					let playtimeDictMs = {};
+					for (const user in userDict) {
+						let playtimeMs = 0;
+						for (const track of userDict[user]) {
+							playtimeMs += track.durationMs;
+						}
+						playtimeDictMs[user] = playtimeMs;
+					}
+					let popularityDict = {};
+					for (const user in userDict) {
+						let popularities = [];
+						for (const track of userDict[user]) {
+							popularities.push(track.popularity);
+						}
+						popularityDict[user] = popularities.reduce((accumulator, currentValue) => accumulator + currentValue) / popularities.length;
+					}
+
+					translateUserIdsToNames(Object.keys(nSongsDict)).then(names => {
+						const canvasNumSongs = document.getElementById('pie-chart-num-songs');
+						if (chartNumSongs != null) {
+							chartNumSongs.destroy();
+						}
+						chartNumSongs = new Chart(canvasNumSongs, {
+							type: 'pie',
+							data: {
+								labels: names,
+								datasets: [{
+									data: Object.values(nSongsDict),
+								}]
+							},
+							options: {
+								legend: {
+									position: 'top',
+								},
+								plugins: {
+									title: {
+										display: true,
+										text: 'Number of songs'
+									}
+								},
+								animation: {
+									animateScale: true,
+									animateRotate: true
+								}
+							}
+						});
+
+						function formatTime(seconds) {
+							const hours = Math.floor(seconds / 3600);
+							const minutes = Math.floor((seconds % 3600) / 60);
+							const secs = seconds % 60;
+							var ret = "";
+							if (hours > 0) {
+								ret += `${hours}h `;
+							}
+							if (minutes > 0) {
+								ret += `${minutes}m `;
+							}
+							ret += `${secs}s`;
+							return ret;
+						}
+
+						const canvasPlaytime = document.getElementById('pie-chart-playtime');
+						if (chartPlaytime != null) {
+							chartPlaytime.destroy();
+						}
+						chartPlaytime = new Chart(canvasPlaytime, {
+							type: 'pie',
+							data: {
+								labels: names,
+								datasets: [{
+									data: Object.values(playtimeDictMs),
+								}]
+							},
+							options: {
+								legend: {
+									position: 'top',
+								},
+								plugins: {
+									title: {
+										display: true,
+										text: 'Playtime'
+									},
+									tooltip: {
+										callbacks: {
+											label: function(ctx) {
+												const labelMs = ctx.raw;
+												// parse to human readable
+												return formatTime(Math.floor(labelMs / 1000));												
+											}
+										}
+									}
+								},
+								animation: {
+									animateScale: true,
+									animateRotate: true
+								},
+							}
+						});
+	
+						setInputEnabled(true);
+					});
+
+				});
+			}
+
+			function logoutClicked() {
+				deleteCookie(cookieClientId    );
+				deleteCookie(cookieAccessToken );
+				window.location.href = "index.html";
+			}
+		</script>
+	</body>
+</html>
