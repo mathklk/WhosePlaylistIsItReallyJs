@@ -2,7 +2,11 @@
 
 A simple web app that analyzes Spotify collaborative playlists and determines who added most of the songs.
 
-Live demo: TBD
+# Demo
+
+You can try it out [here](https://mathklk.github.io/WhosePlaylistIsItReallyJs/).
+
+You can either use the Spotify API access included in this app (rate limited) or specify your own client ID.
 
 # Dependencies
 
