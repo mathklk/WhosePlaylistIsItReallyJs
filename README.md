@@ -4,7 +4,7 @@ A simple web app that analyzes Spotify collaborative playlists and determines wh
 
 # Demo
 
-You can try it out [here](https://mathklk.github.io/WhosePlaylistIsItReallyJs/).
+You can try it out [here](https://mathklk.github.io/WhosePlaylistIsItReallyJs/src).
 
 You can either use the Spotify API access included in this app (rate limited) or specify your own client ID.
 
